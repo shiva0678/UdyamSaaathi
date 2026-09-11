@@ -1,0 +1,14 @@
+[
+  {"id":"market-001","location":"Mandya","business_category":"Agriculture and Livestock","demand_level":"High","competition_level":"Medium","market_score":86},
+  {"id":"market-002","location":"Mysuru","business_category":"Food Processing","demand_level":"High","competition_level":"High","market_score":78},
+  {"id":"market-003","location":"Hassan","business_category":"Agriculture and Livestock","demand_level":"High","competition_level":"Medium","market_score":84},
+  {"id":"market-004","location":"Tumakuru","business_category":"Services and Technology","demand_level":"High","competition_level":"Medium","market_score":82},
+  {"id":"market-005","location":"Kolar","business_category":"Agriculture","demand_level":"High","competition_level":"High","market_score":80},
+  {"id":"market-006","location":"Chikkaballapur","business_category":"Food Processing","demand_level":"Medium","competition_level":"Medium","market_score":74},
+  {"id":"market-007","location":"Shivamogga","business_category":"Agriculture and Livestock","demand_level":"High","competition_level":"Low","market_score":88},
+  {"id":"market-008","location":"Belagavi","business_category":"Manufacturing and Crafts","demand_level":"Medium","competition_level":"Medium","market_score":72},
+  {"id":"market-009","location":"Dharwad","business_category":"Services and Crafts","demand_level":"Medium","competition_level":"Medium","market_score":76},
+  {"id":"market-010","location":"Bengaluru Rural","business_category":"Services and Technology","demand_level":"High","competition_level":"High","market_score":79},
+  {"id":"market-011","location":"Mandya","business_category":"Food Processing","demand_level":"High","competition_level":"Medium","market_score":83},
+  {"id":"market-012","location":"Mysuru","business_category":"Services and Crafts","demand_level":"High","competition_level":"High","market_score":77}
+]

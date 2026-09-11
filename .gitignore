@@ -1,0 +1,47 @@
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Testing / coverage
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Local databases / generated files
+*.sqlite
+*.sqlite3
+
+# FAISS generated indexes
+*.index
+*.faiss
+
+# Temporary files
+tmp/
+temp/

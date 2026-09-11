@@ -1,0 +1,32 @@
+[
+  {
+    "document_name": "UdyamSaathi Prototype Guidance",
+    "source": "UdyamSaathi synthetic demo guidance",
+    "text": "UdyamSaathi provides prototype suitability scores using synthetic business estimates. A recommendation is a starting point for discussion and is not a guarantee of success. Users should validate local demand, costs, and operating requirements before investing.",
+    "metadata": {
+      "topic": "recommendations",
+      "verification_status": "demo",
+      "chunk_index": 0
+    }
+  },
+  {
+    "document_name": "Business Setup Checklist",
+    "source": "UdyamSaathi synthetic demo guidance",
+    "text": "A practical business setup sequence is to review the opportunity, confirm the initial investment and monthly budget, prepare identity and business documents, verify applicable support with official sources, confirm registrations and approvals with the relevant authority, and then begin setup.",
+    "metadata": {
+      "topic": "setup",
+      "verification_status": "demo",
+      "chunk_index": 0
+    }
+  },
+  {
+    "document_name": "Support and Approval Notice",
+    "source": "UdyamSaathi synthetic demo guidance",
+    "text": "Support records and approval records in this prototype are synthetic demonstration data. Do not treat them as verified government schemes or legal advice. Verify current eligibility, documents, fees, and process steps with official sources before applying.",
+    "metadata": {
+      "topic": "support and approvals",
+      "verification_status": "demo",
+      "chunk_index": 0
+    }
+  }
+]

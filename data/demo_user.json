@@ -1,0 +1,13 @@
+{
+  "id": "demo-user-001",
+  "name": "Ramesh",
+  "location": "Karnataka",
+  "capital": 200000,
+  "land": 2.0,
+  "water": "Available",
+  "skills": ["Farming", "Animal Care"],
+  "resources": ["2 acres of land", "Available water"],
+  "experience": "Basic",
+  "goal": "Increase income",
+  "profile_type": "Demo Profile — Synthetic Data"
+}
