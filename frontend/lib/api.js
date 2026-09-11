@@ -1,20 +1,29 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
 
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || `Request failed with status ${response.status}`);
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      const error = new Error(payload?.message || "The service could not complete this step.");
+      error.code = payload?.error_code;
+      throw error;
+    }
+
+    return payload;
+  } catch (error) {
+    if (error instanceof TypeError || error.name === "AbortError") {
+      throw new Error("UdyamSaathi is temporarily unavailable. Please try again.");
+    }
+    throw new Error("We couldn't complete this step right now. Please try again.");
   }
-
-  return response.json();
 }
 
 export function createUserProfile(profile) {
@@ -56,9 +65,9 @@ export function getActionPlan(profile, userId, businessId) {
   });
 }
 
-export function sendChat(message, profile) {
+export function sendChat(message, profile, history = []) {
   return request("/api/chat", {
     method: "POST",
-    body: JSON.stringify({ message, profile }),
+    body: JSON.stringify({ message, profile, history }),
   });
 }

@@ -30,9 +30,9 @@ export function AssessmentForm({ profile, setProfile, onSubmit, loading }) {
       <h2>Tell us about your starting point.</h2>
       <p className="section-intro">A few simple answers help us find a practical match for you.</p>
       <div className="form-grid">
-        <label>What is your name?<input value={profile.name} onChange={(event) => update("name", event.target.value)} placeholder="e.g. Ramesh" /></label>
-        <label>Where are you based?<input value={profile.location} onChange={(event) => update("location", event.target.value)} placeholder="e.g. Karnataka" /></label>
-        <label>Available investment (INR)<input type="number" min="0" value={profile.capital} onChange={(event) => update("capital", event.target.value)} placeholder="200000" /></label>
+        <label>What is your name?<input required value={profile.name} onChange={(event) => update("name", event.target.value)} placeholder="e.g. Ramesh" /></label>
+        <label>Where are you based?<input required value={profile.location} onChange={(event) => update("location", event.target.value)} placeholder="e.g. Karnataka" /></label>
+        <label>Available investment (INR)<input required type="number" min="0" value={profile.capital} onChange={(event) => update("capital", event.target.value)} placeholder="200000" /></label>
         <label>What skills do you have?<input value={profile.skills} onChange={(event) => update("skills", event.target.value)} placeholder="Farming, Animal Care" /></label>
         <label>What resources do you have?<input value={profile.resources} onChange={(event) => update("resources", event.target.value)} placeholder="2 acres of land, Available water" /></label>
         <label>How much experience do you have?
@@ -42,7 +42,7 @@ export function AssessmentForm({ profile, setProfile, onSubmit, loading }) {
         </label>
         <label className="full-field">What would you like to achieve?<input value={profile.goal} onChange={(event) => update("goal", event.target.value)} placeholder="Increase income" /></label>
       </div>
-      <button className="primary-button" type="button" onClick={onSubmit} disabled={loading || !profile.name || !profile.location || !profile.capital || !profile.experience}>
+      <button className="primary-button" type="button" onClick={onSubmit} disabled={loading || !profile.name.trim() || !profile.location.trim() || !profile.capital || !profile.experience}>
         {loading ? "Preparing your path..." : "Continue to assessment"}<span aria-hidden="true">-&gt;</span>
       </button>
     </section>
@@ -87,7 +87,7 @@ export function ApprovalChecklist({ approvals }) {
 }
 
 export function ActionPlan({ plan }) {
-  return <section className="panel action-panel"><p className="eyebrow">STEP 08 / YOUR NEXT STEPS</p><h2>A clear way forward.</h2><ol className="action-list">{plan.steps.map((step) => <li key={step}>{step}</li>)}</ol><p className="notice">{plan.notice}</p></section>;
+  return <section className="panel action-panel"><p className="eyebrow">STEP 08 / YOUR NEXT STEPS</p><h2>A clear way forward.</h2>{plan?.steps?.length ? <><ol className="action-list">{plan.steps.map((step) => <li key={step}>{step}</li>)}</ol><p className="notice">{plan.notice}</p></> : <p className="empty-copy">We couldn't generate your next steps right now. Please try again.</p>}</section>;
 }
 
 export function LoadingState() { return <div className="state-card"><span className="loader" />Building your personalized path...</div>; }
