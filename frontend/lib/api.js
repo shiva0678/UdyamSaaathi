@@ -22,6 +22,7 @@ async function request(path, options = {}) {
     if (error instanceof TypeError || error.name === "AbortError") {
       throw new Error("UdyamSaathi is temporarily unavailable. Please try again.");
     }
+    if (error.code) throw error;
     throw new Error("We couldn't complete this step right now. Please try again.");
   }
 }
@@ -65,9 +66,9 @@ export function getActionPlan(profile, userId, businessId) {
   });
 }
 
-export function sendChat(message, profile, history = []) {
+export function sendChat(message, profile, history = [], language = "en") {
   return request("/api/chat", {
     method: "POST",
-    body: JSON.stringify({ message, profile, history }),
+    body: JSON.stringify({ message, profile, history, language }),
   });
 }

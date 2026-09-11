@@ -5,3 +5,4 @@ python-dotenv>=1.0,<2.0
 numpy>=2.0,<3.0
 faiss-cpu>=1.8,<2.0
 httpx2>=2.0,<3.0
+openai>=1.0,<2.0

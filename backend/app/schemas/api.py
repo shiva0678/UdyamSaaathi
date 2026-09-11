@@ -91,9 +91,11 @@ class ActionPlanResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1)
+    language: str | None = None
     user_id: str | None = None
     business_id: str | None = None
     profile: dict[str, Any] | None = None
+    history: list[dict[str, str]] = Field(default_factory=list)
 
 
 class ChatSource(BaseModel):
@@ -109,6 +111,10 @@ class ChatResponse(BaseModel):
     follow_up_questions: list[str] = Field(default_factory=list)
     provider: str
     sources: list[ChatSource] = Field(default_factory=list)
+    success: bool = True
+    ai_enabled: bool = False
+    rag_used: bool = False
+    error_code: str | None = None
 
 
 class BusinessProfile(BaseModel):

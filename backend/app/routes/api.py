@@ -1,6 +1,9 @@
 from uuid import uuid4
 
+import logging
+
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import JSONResponse
 from psycopg.types.json import Jsonb
 
 from app.database import get_connection
@@ -10,12 +13,15 @@ from app.engines.financial import calculate_from_records
 from app.engines.recommendation import DISCLAIMER, build_recommendation, recommend_businesses
 from app.engines.scheme_matcher import DEMO_NOTICE, match_schemes
 from app.services.llm_service import (
+    AIServiceError,
     ask_llm,
+    ai_status,
     classify_message,
+    detect_language,
     extract_profile,
     missing_profile_questions,
 )
-from app.services.rag_service import retrieve_context
+from app.services.rag_service import rag_available, retrieve_context
 from app.schemas.api import (
     ActionPlanRequest,
     ActionPlanResponse,
@@ -36,6 +42,7 @@ from app.schemas.api import (
 )
 
 router = APIRouter(prefix="/api")
+logger = logging.getLogger(__name__)
 
 
 def _profile_from_user(row: dict) -> dict:
@@ -50,9 +57,38 @@ def _profile_from_user(row: dict) -> dict:
     }
 
 
+def _language_text(language: str, english: str, kannada: str) -> str:
+    return kannada if language == "kn" else english
+
+
+def _localize_action_step(step: str, language: str) -> str:
+    if language != "kn":
+        return step
+    translations = {
+        "Review the ": " ಶಿಫಾರಸನ್ನು ಮತ್ತು ಅದರ ಪ್ರಾಥಮಿಕ ಹೊಂದಾಣಿಕೆ ಅಂಕವನ್ನು ಪರಿಶೀಲಿಸಿ.",
+        "Explore financing options for the estimated capital gap.": "ಅಂದಾಜು ಹೂಡಿಕೆ ಕೊರತೆಯಿಗಾಗಿ ಹಣಕಾಸಿನ ಆಯ್ಕೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+        "Set aside the estimated initial investment and confirm the operating budget.": "ಅಂದಾಜು ಆರಂಭಿಕ ಹೂಡಿಕೆಯನ್ನು ಮೀಸಲಿಟ್ಟು ಕಾರ್ಯಾಚರಣಾ ಬಜೆಟ್ ಪರಿಶೀಲಿಸಿ.",
+        "Check the suitable support records and verify details with official sources before applying.": "ಸೂಕ್ತ ಬೆಂಬಲ ದಾಖಲೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಅರ್ಜಿ ಸಲ್ಲಿಸುವ ಮೊದಲು ಅಧಿಕೃತ ಮೂಲಗಳಲ್ಲಿ ವಿವರಗಳನ್ನು ದೃಢಪಡಿಸಿ.",
+        "Prepare the listed documents and complete the applicable registration or approval.": "ಪಟ್ಟಿಯಲ್ಲಿರುವ ದಾಖಲೆಗಳನ್ನು ಸಿದ್ಧಪಡಿಸಿ ಮತ್ತು ಅನ್ವಯಿಸುವ ನೋಂದಣಿ ಅಥವಾ ಅನುಮತಿಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ.",
+        "Confirm required registrations and approvals with the relevant local authority.": "ಅಗತ್ಯ ನೋಂದಣಿ ಮತ್ತು ಅನುಮತಿಗಳನ್ನು ಸಂಬಂಧಿತ ಸ್ಥಳೀಯ ಅಧಿಕಾರಿಯಿಂದ ದೃಢಪಡಿಸಿ.",
+        "Begin business setup only after confirming costs, support, and approvals.": "ವೆಚ್ಚ, ಬೆಂಬಲ ಮತ್ತು ಅನುಮತಿಗಳನ್ನು ದೃಢಪಡಿಸಿದ ನಂತರ ಮಾತ್ರ ವ್ಯವಹಾರ ಪ್ರಾರಂಭಿಸಿ.",
+        "Check official sources for support that may apply to this business.": "ಈ ವ್ಯವಹಾರಕ್ಕೆ ಅನ್ವಯಿಸಬಹುದಾದ ಬೆಂಬಲಕ್ಕಾಗಿ ಅಧಿಕೃತ ಮೂಲಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+    }
+    if step.startswith("Review the "):
+        return step.removeprefix("Review the ").split(" recommendation")[0] + translations["Review the "]
+    return translations.get(step, step)
+
+
+@router.get("/ai/status")
+def get_ai_status() -> dict:
+    return {**ai_status(), "rag_available": rag_available()}
+
+
 @router.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest) -> ChatResponse:
     intent = classify_message(request.message)
+    response_language = request.language if request.language in {"en", "kn"} else detect_language(request.message)
+    logger.info("Chat request received: intent=%s", intent)
     profile = request.profile or {}
     user = None
     business = None
@@ -97,8 +133,24 @@ def chat(request: ChatRequest) -> ChatResponse:
     extracted_profile = extract_profile(request.message, profile)
 
     if intent == "information":
-        context = retrieve_context(request.message)
-        result = ask_llm(request.message, context)
+        context = []
+        try:
+            context = retrieve_context(request.message)
+        except Exception:
+            logger.exception("RAG retrieval failed; continuing without prototype context")
+        try:
+            result = ask_llm(request.message, context, request.history, response_language)
+        except AIServiceError as error:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "success": False,
+                    "message": error.message,
+                    "error_code": error.code,
+                    "ai_enabled": False,
+                    "rag_used": False,
+                },
+            )
         sources = [
             ChatSource(
                 document_name=item["document_name"],
@@ -112,9 +164,21 @@ def chat(request: ChatRequest) -> ChatResponse:
     if intent in {"financial", "support", "recommendation", "action_plan"} and (
         not profile.get("capital") or not profile.get("location")
     ):
-        fallback = ask_llm(request.message, extracted_profile)
+        try:
+            fallback = ask_llm(request.message, [], request.history, response_language)
+        except AIServiceError as error:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "success": False,
+                    "message": error.message,
+                    "error_code": error.code,
+                    "ai_enabled": False,
+                    "rag_used": False,
+                },
+            )
         fallback["profile"] = extracted_profile
-        fallback["follow_up_questions"] = missing_profile_questions(extracted_profile)
+        fallback["follow_up_questions"] = missing_profile_questions(extracted_profile, response_language)
         return ChatResponse(
             intent=intent,
             **fallback,
@@ -131,10 +195,13 @@ def chat(request: ChatRequest) -> ChatResponse:
         recommendations = recommend_businesses(extracted_profile, businesses)
         first = recommendations[0] if recommendations else None
         message = (
-            f"The strongest prototype match is {first['business']} with a "
-            f"match score of {first['match_score']}."
+            _language_text(
+                response_language,
+                f"The strongest prototype match is {first['business']} with a match score of {first['match_score']}.",
+                f"ನಿಮ್ಮ ಪ್ರೊಫೈಲ್‌ಗೆ ಅತ್ಯಂತ ಸೂಕ್ತವಾದ ಡೆಮೊ ವ್ಯವಹಾರ {first['business']}. ಹೊಂದಾಣಿಕೆ ಅಂಕ: {first['match_score'] }.",
+            )
             if first
-            else "I could not find a recommendation from the available records."
+            else _language_text(response_language, "I could not find a recommendation from the available records.", "ಲಭ್ಯವಿರುವ ದಾಖಲೆಗಳಿಂದ ಶಿಫಾರಸು ಕಂಡುಬಂದಿಲ್ಲ.")
         )
         return ChatResponse(
             message=message,
@@ -145,10 +212,10 @@ def chat(request: ChatRequest) -> ChatResponse:
 
     if business is None:
         return ChatResponse(
-            message="Which business would you like me to check? Please provide its business_id or name.",
+            message=_language_text(response_language, "Which business would you like me to check? Please provide its business_id or name.", "ನೀವು ಯಾವ ವ್ಯವಹಾರವನ್ನು ಪರಿಶೀಲಿಸಲು ಬಯಸುತ್ತೀರಿ? ಅದರ ಹೆಸರು ಅಥವಾ business_id ನೀಡಿ."),
             intent=intent,
             profile=extracted_profile,
-            follow_up_questions=["Which business should I check?"],
+            follow_up_questions=[_language_text(response_language, "Which business should I check?", "ಯಾವ ವ್ಯವಹಾರವನ್ನು ಪರಿಶೀಲಿಸಬೇಕು?")],
             provider="rule-based fallback",
         )
 
@@ -158,9 +225,11 @@ def chat(request: ChatRequest) -> ChatResponse:
         )
         return ChatResponse(
             message=(
-                f"{business['name']} is {financial['financial_status']} based on the "
-                f"synthetic estimate. Monthly profit is {financial['monthly_profit']} "
-                f"and the estimated capital gap is {financial['capital_gap']}."
+                _language_text(
+                    response_language,
+                    f"{business['name']} is {financial['financial_status']} based on the synthetic estimate. Monthly profit is ₹{financial['monthly_profit']} and the estimated capital gap is ₹{financial['capital_gap']}.",
+                    f"ಸಿಂಥೆಟಿಕ್ ಅಂದಾಜಿನ ಪ್ರಕಾರ {business['name']} ಸ್ಥಿತಿ {financial['financial_status']}. ತಿಂಗಳ ಲಾಭ ₹{financial['monthly_profit']} ಮತ್ತು ಅಂದಾಜು ಹೂಡಿಕೆ ಕೊರತೆ ₹{financial['capital_gap']}.",
+                )
             ),
             intent=intent,
             profile=extracted_profile,
@@ -171,7 +240,7 @@ def chat(request: ChatRequest) -> ChatResponse:
         matches = match_schemes(extracted_profile, business, schemes)
         names = ", ".join(item["scheme_name"] for item in matches[:3])
         return ChatResponse(
-            message=f"Potential demo support records for {business['name']}: {names}. Verify official sources before applying.",
+            message=_language_text(response_language, f"Potential demo support records for {business['name']}: {names}. Verify official sources before applying.", f"{business['name']}ಗಾಗಿ ಹೊಂದಾಣಿಕೆಯಾಗಬಹುದಾದ ಡೆಮೊ ಬೆಂಬಲ: {names}. ಅರ್ಜಿ ಸಲ್ಲಿಸುವ ಮೊದಲು ಅಧಿಕೃತ ಮೂಲಗಳಲ್ಲಿ ಪರಿಶೀಲಿಸಿ."),
             intent=intent,
             profile=extracted_profile,
             provider="rule-based support matcher",
@@ -180,10 +249,10 @@ def chat(request: ChatRequest) -> ChatResponse:
     if intent == "approval":
         approvals = format_approvals(approval_rows)
         message = (
-            f"For {business['name']}, review: "
+            _language_text(response_language, f"For {business['name']}, review: ", f"{business['name']}ಗಾಗಿ ಪರಿಶೀಲಿಸಬೇಕಾದವು: ")
             + "; ".join(item["license"] for item in approvals)
             if approvals
-            else "No synthetic approval record is available for this business. Verify with the relevant authority."
+            else _language_text(response_language, "No synthetic approval record is available for this business. Verify with the relevant authority.", "ಈ ವ್ಯವಹಾರಕ್ಕೆ ಸಿಂಥೆಟಿಕ್ ಅನುಮತಿ ದಾಖಲೆ ಲಭ್ಯವಿಲ್ಲ. ಸಂಬಂಧಿತ ಅಧಿಕಾರಿಯಿಂದ ಪರಿಶೀಲಿಸಿ.")
         )
         return ChatResponse(
             message=message,
@@ -201,7 +270,7 @@ def chat(request: ChatRequest) -> ChatResponse:
         recommendations[0], financial, support, format_approvals(approval_rows)
     )
     return ChatResponse(
-        message="\n".join(f"{index}. {step}" for index, step in enumerate(action_plan, 1)),
+        message="\n".join(f"{index}. {_localize_action_step(step, response_language)}" for index, step in enumerate(action_plan, 1)),
         intent=intent,
         profile=extracted_profile,
         provider="rule-based action-plan engine",
